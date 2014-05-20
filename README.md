@@ -61,6 +61,9 @@ Note that Luigi performs induced dispatch for multiple tasks packaged
 together in a single module.  Such a sequence of tasks is regarded as a
 single job from a scalegrease point of view.
 
+Many jobs are parameterised, e.g. on date.  The dispatch mechanism or the
+execution mechanism should fill in the dynamic parameters.
+
 
 Arbitration
 -----------
@@ -100,7 +103,6 @@ debugging job failures.
 
 
 
-
 Roadmap
 =======
 
@@ -112,10 +114,17 @@ script.  Scheduled dispatch is supported in a primitive manner, with
 crontab lines on redundant scheduling machines.
 
 Arbitration through simple ZooKeeper-based queue, aka funnel, which
-discards duplicate jobs.
+discards duplicate jobs.  Finished and failed jobs are retained in the
+queue for a limited time, in order to avoid duplicated job runs within a
+time window (< 1h).
 
 Workers pull jobs from the funnel, and locally deploy a job jar, specified
-in job description, from a central artifactory.
+in job description, from a central artifactory.  They determine the type of
+jar, and invoke the appropriate runner, ShellRunner, HadoopRunner, or
+LuigiRunner.  For non-trivial cases, use the LuigiRunner for specifying
+inputs/outputs, parameter resolution, cascading backfill jobs, etc.  Luigi
+essentially provides our job specification embedded DSL, but does not use
+the central Luigi scheduler.
 
 Logs are generated/copied to a common log directory, which should live on
 shared storage, e.g. an NFS mount.
