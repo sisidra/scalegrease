@@ -14,3 +14,10 @@ def write_file(content, settings):
     f = open(settings, "w")
     f.write(content)
     f.close()
+
+
+def load_class(rn):
+    module_name, class_name = rn.rsplit('.', 1)
+    mod = __import__(module_name, globals(), locals(), [class_name])
+    clazz = getattr(mod, class_name)
+    return clazz

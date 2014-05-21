@@ -1,13 +1,13 @@
 import logging
 import subprocess
-from scalegrease.system import check_output
-from scalegrease.runner import RunnerBase
+from scalegrease import system
+from scalegrease import runner
 
 
-class HadoopRunner(RunnerBase):
+class HadoopRunner(runner.RunnerBase):
     def is_recognised(self, jar_path):
         try:
-            jar_listing = check_output(["jar", "tf", jar_path])
+            jar_listing = system.check_output(["jar", "tf", jar_path])
             return "org/apache/crunch/Pipeline.class" in jar_listing.splitlines()
         except subprocess.CalledProcessError:
             return False

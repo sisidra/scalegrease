@@ -27,3 +27,17 @@ def fetch_repo_info(url):
     contents = rsp.read()
     repo_info = json.loads(contents)
     return repo_info
+
+
+class Artifact(object):
+    def __init__(self, spec):
+        self.spec = spec
+
+    def path(self):
+        return "%s/%s" % (self.group_id().replace(".", "/"), self.artifact_id())
+
+    def artifact_id(self):
+        return self.spec.split(":")[-1]
+
+    def group_id(self):
+        return self.spec.split(":")[0]
