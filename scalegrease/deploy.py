@@ -1,32 +1,44 @@
-import json
 import logging
-import urllib
-import urllib2
+import re
+import subprocess
+
+from scalegrease import error
+from scalegrease import system
 
 
-def download(artifact, tmp_dir, version):
-    # TODO: Don't use artifactory REST, use maven instead.
-    repo_url = "https://artifactory.spotify.net/artifactory/api/storage/libs-release-local"
-    artifact_url = "%s/%s" % (repo_url, artifact.path())
-    repo_info = fetch_repo_info(artifact_url)
-    versions = [ch["uri"][1:] for ch in repo_info["children"]]
-    latest_version = sorted(versions, key=lambda v: map(int, v.split('.')))[-1]
+def mvn_download(artifact, tmp_dir, version):
+    """Download artifact from maven repository to local directory.
 
-    jar_base = ("%s-%s-jar-with-dependencies.jar" % (artifact.artifact_id(), latest_version))
-    jar_info_url = ("%s/%s/%s" % (artifact_url, latest_version, jar_base))
-    jar_info = fetch_repo_info(jar_info_url)
-    jar_url = jar_info["downloadUri"]
-    jar_local = "%s/%s" % (tmp_dir, jar_base)
-    urllib.urlretrieve(jar_url, filename=jar_local)
-    return jar_local
+    Maven will by default do local repository caching for us, which we want in order to avoid
+    hammering the artifactory server, and also to avoid the artifactory being a single point of
+    failure.  An artifactory failure will prevent new versions from getting rolled out, but not
+    jobs from running.
+    """
+    try:
+        # Notes on maven behaviour:  In case of network failure, it will reuse the locally cached
+        # repository metadata gracefully, and therefore use the latest downloaded version.
+        # In case multiple maven processes are running, they might download a new artifact
+        # concurrently.  Maven downloads to temporary file and renames, however, so each file
+        # download is atomic, and no external locking should be needed.
+        version_string = version or "LATEST"
+        mvn_copy_cmd = [
+            "mvn", "-e", "-U", "org.apache.maven.plugins:maven-dependency-plugin:2.8:copy",
+            "-DoutputDirectory=" + tmp_dir,
+            "-Dartifact=%s:%s:jar:jar-with-dependencies" % (artifact.spec, version_string)]
 
+        logging.info(" ".join(mvn_copy_cmd))
+        mvn_copy_out = system.check_output(mvn_copy_cmd)
+        copying_re = r'Copying .*\.jar to (.*)'
+        match = re.search(copying_re, mvn_copy_out)
+        jar_path = match.group(1)
+        logging.info("Downloaded %s:%s to %s", artifact.spec, version_string, jar_path)
+        logging.debug(mvn_copy_out)
+        return jar_path
 
-def fetch_repo_info(url):
-    logging.debug("Retrieving %s", url)
-    rsp = urllib2.urlopen(url)
-    contents = rsp.read()
-    repo_info = json.loads(contents)
-    return repo_info
+    except subprocess.CalledProcessError as e:
+        logging.error("Maven failed: %s, output:\n%s", e, e.output)
+        raise error.Error("Download failed: %s\n%s" % (e, e.output))
+
 
 
 class Artifact(object):

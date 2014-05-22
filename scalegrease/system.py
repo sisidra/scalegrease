@@ -10,8 +10,8 @@ def check_output(cmd):
     return output
 
 
-def write_file(content, settings):
-    f = open(settings, "w")
+def write_file(path, content):
+    f = open(path, "w")
     f.write(content)
     f.close()
 

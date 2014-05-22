@@ -46,7 +46,7 @@ def find_runner(jar_path):
 def run(artifact_spec, version):
     artifact = deploy.Artifact(artifact_spec)
     tmp_dir = tempfile.mkdtemp(prefix="greaseworker")
-    jar_path = deploy.download(artifact, tmp_dir, version)
+    jar_path = deploy.mvn_download(artifact, tmp_dir, version)
     worker = find_runner(jar_path)
     if worker is None:
         raise error.Error("Failed to find a worker for %s" % artifact_spec)
@@ -58,10 +58,10 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Increase debug verbosity")
+    parser.add_argument("--version", "-V", help="Artifact version to download")
     parser.add_argument(
         "artifact",
         help="Specify Maven artifact to download and run, e.g. com.spotify.data:super-cruncher")
-    parser.add_argument("--version", "-V", help="Artifact version to download")
     args = parser.parse_args(argv[1:])
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
