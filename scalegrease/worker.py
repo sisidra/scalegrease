@@ -1,7 +1,7 @@
 import sys
 
 def main(argv):
-    # Poll stuff from queue, call runner.
+    # Pull stuff from queue, call runner.
     pass
 
 

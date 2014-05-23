@@ -1,5 +1,6 @@
 import logging
 import subprocess
+
 from scalegrease import system
 from scalegrease import runner
 
@@ -13,6 +14,6 @@ class HadoopRunner(runner.RunnerBase):
             return False
 
     def run_job(self, jar_path):
-        hadoop_cmd = ["hadoop", "jar", jar_path]
+        hadoop_cmd = self._config["command"] + [jar_path]
         logging.info("Executing: %s", " ".join(hadoop_cmd))
         subprocess.check_call(hadoop_cmd)
