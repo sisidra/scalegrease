@@ -3,11 +3,10 @@ import re
 import subprocess
 
 from scalegrease import error
-
 from scalegrease import system
 
 
-def mvn_download(artifact, tmp_dir):
+def mvn_download(artifact, tmp_dir, offline):
     """Download artifact from maven repository to local directory.
 
     Maven will by default do local repository caching for us, which we want in order to avoid
@@ -22,9 +21,9 @@ def mvn_download(artifact, tmp_dir):
         # concurrently.  Maven downloads to temporary file and renames, however, so each file
         # download is atomic, and no external locking should be needed.
         mvn_copy_cmd = [
-            "mvn", "-e", "-U", "org.apache.maven.plugins:maven-dependency-plugin:2.8:copy",
+            "mvn", "-e", "-o" if offline else "-U", "org.apache.maven.plugins:maven-dependency-plugin:2.8:copy",
             "-DoutputDirectory=" + tmp_dir,
-            "-Dartifact=%s:%s:jar:jar-with-dependencies" % (artifact.spec, artifact.version())]
+            "-Dartifact=%s:%s:%s:jar:jar-with-dependencies" % (artifact.group_id(), artifact.artifact_id(), artifact.version())]
 
         logging.info(" ".join(mvn_copy_cmd))
         mvn_copy_out = system.check_output(mvn_copy_cmd)

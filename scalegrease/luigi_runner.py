@@ -1,28 +1,33 @@
 import os
 import shutil
+import subprocess
 import tempfile
 import zipfile
-import sys
 import argparse
 
-import luigi
-import spotify.luigi.interface
 from scalegrease.runner import RunnerBase
 
 
 class LuigiRunner(RunnerBase):
-    def __init__(self):
+    def __init__(self, config):
+        super(LuigiRunner, self).__init__(config)
         self.tmp_dir = None
 
-    def is_recognised(self, jar_path):
-        pass
+    def is_recognised(self, jar_path, argv):
+        """
+        Check by searching for luigi required parameters (module and task).
+        """
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--module", "-m")
+        parser.add_argument("--task")
+        args, _ = parser.parse_known_args(argv)
+        return args.module and args.task
 
-    def run_job(self, jar_path, *args):
+    def run_job(self, jar_path, artifact_spec, argv):
         self.tmp_dir = tempfile.mkdtemp()
-        sys.path.append(os.path.join(self.tmp_dir, "luigi"))
         try:
             self._extract_luigi_resources(jar_path)
-            return self._run_luigi_task(jar_path, args)
+            self._run_luigi_task(artifact_spec, argv)
         finally:
             shutil.rmtree(self.tmp_dir)
 
@@ -31,28 +36,31 @@ class LuigiRunner(RunnerBase):
         for info in jar_file.infolist():
             resource_path = info.filename
 
-            if resource_path.startswith("luigi/"):
+            if resource_path.startswith("python/"):
                 jar_file.extract(info, self.tmp_dir)
 
-    def _run_luigi_task(self, jar_path, cmd_args):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--module", "-m", help="Python module where task is defined")
-        args, rest_cmd_args = parser.parse_known_args(cmd_args)
+    def _run_luigi_task(self, artifact_spec, cmd_args):
+        runner_cmd = self._config["command"]
 
-        rest_cmd_args.append("--jar-name")
-        rest_cmd_args.append(jar_path)
+        sub_env = os.environ.copy()
+        sub_env["PLATFORM_ARTIFACT_SPEC"] = artifact_spec
 
-        __import__(args.module)
+        src_path = os.path.join(self.tmp_dir, "python")
+        if sub_env["PYTHONPATH"]:
+            sub_env["PYTHONPATH"] += ":" + src_path
+        else:
+            sub_env["PYTHONPATH"] = src_path
 
-        # until here
-        worker_factory = spotify.luigi.interface.WorkerSchedulerFactory()
-        luigi.run(
-            cmdline_args=rest_cmd_args,
-            use_optparse=True,
-            worker_scheduler_factory=worker_factory
+        cmd_line = [runner_cmd] + list(cmd_args)
+
+        process = subprocess.Popen(
+            cmd_line,
+            env=sub_env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
         )
-
-
-if __name__ == "__main__":
-    runner = LuigiRunner()
-    runner.run_job(sys.argv[1], *sys.argv[2:])
+        output, _ = process.communicate()
+        exit_code = process.poll()
+        print output
+        if exit_code:
+            raise subprocess.CalledProcessError(exit_code, cmd_line, output=output)

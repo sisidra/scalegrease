@@ -1,10 +1,10 @@
 {
     "runners": [
-        "scalegrease.luigi.LuigiRunner",
+        "scalegrease.luigi_runner.LuigiRunner",
         "scalegrease.hadoop.HadoopRunner"
     ],
     "LuigiRunner": {
-        "command": "luigi"
+        "command": "spluigi"
     },
     "HadoopRunner": {
         "command": ["hadoop", "jar"]

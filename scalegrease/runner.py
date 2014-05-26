@@ -18,23 +18,23 @@ class RunnerBase(object):
         self._config = config
 
     @abc.abstractmethod
-    def is_recognised(self, jar_path):
+    def is_recognised(self, jar_path, argv):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def run_job(self, jar_path):
+    def run_job(self, jar_path, artifact_spec, argv):
         raise NotImplementedError()
 
 
 class ShellRunner(RunnerBase):
-    def is_recognised(self, jar_path):
+    def is_recognised(self, jar_path, argv):
         pass
 
-    def run_job(self, jar_path):
+    def run_job(self, jar_path, artifact_spec, argv):
         pass
 
 
-def find_runner(jar_path, config):
+def find_runner(jar_path, argv, config):
     names = config['runners']
     runners = []
     for rn in names:
@@ -42,18 +42,18 @@ def find_runner(jar_path, config):
         class_config = config.get(clazz.__name__)
         runners.append(clazz(class_config))
     for r in runners:
-        if r.is_recognised(jar_path):
+        if r.is_recognised(jar_path, argv):
             return r
 
 
-def run(artifact_spec, config):
-    artifact = deploy.Artifact(artifact_spec)
+def run(args, argv, config):
+    artifact = deploy.Artifact(args.artifact)
     tmp_dir = tempfile.mkdtemp(prefix="greaserun")
-    jar_path = deploy.mvn_download(artifact, tmp_dir)
-    runner = find_runner(jar_path, config)
+    jar_path = deploy.mvn_download(artifact, tmp_dir, args.mvn_offline)
+    runner = find_runner(jar_path, argv, config)
     if runner is None:
-        raise error.Error("Failed to find a runner for %s" % artifact_spec)
-    runner.run_job(jar_path)
+        raise error.Error("Failed to find a runner for %s" % args.artifact)
+    runner.run_job(jar_path, args.artifact, argv)
     shutil.rmtree(tmp_dir)
 
 
@@ -63,11 +63,13 @@ def main(argv):
                         help="Read configuration from CONFIG_FILE")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Increase debug verbosity")
+    parser.add_argument("--mvn-offline", "-o", default=False,
+                        help="Use Maven in offline mode")
     parser.add_argument(
         "artifact",
         help="Specify Maven artifact to download and run, either on format "
              "group_id:artifact_id:version or group_id:artifact_id for latest version.")
-    args = parser.parse_args(argv[1:])
+    args, rest_argv = parser.parse_known_args(argv[1:])
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
     logging.info("Reading configuration from %s", args.config_file)
@@ -76,7 +78,7 @@ def main(argv):
     logging.debug("Configuration read:\n%s", conf)
 
     try:
-        run(args.artifact, conf)
+        run(args, rest_argv, conf)
     except error.Error as e:
         logging.error("Job failed: %s", e)
         return 1
