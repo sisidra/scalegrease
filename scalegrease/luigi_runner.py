@@ -5,6 +5,7 @@ import tempfile
 import zipfile
 import argparse
 
+from scalegrease import system
 from scalegrease.runner import RunnerBase
 
 
@@ -63,4 +64,4 @@ class LuigiRunner(RunnerBase):
         exit_code = process.poll()
         print output
         if exit_code:
-            raise subprocess.CalledProcessError(exit_code, cmd_line, output=output)
+            raise system.CalledProcessError(exit_code, cmd_line, output=output)

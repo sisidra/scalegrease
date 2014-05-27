@@ -1,12 +1,21 @@
 import subprocess
 
 
+class CalledProcessError(subprocess.CalledProcessError):
+    """
+    Python 2.6 subprocess.CalledProcessError has no "output" property.
+    """
+    def __init__(self, returncode, cmd, output=None):
+        super(CalledProcessError, self).__init__(returncode, cmd)
+        self.output = output
+
+
 def check_output(cmd):
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output, _ = process.communicate()
     exit_code = process.poll()
     if exit_code:
-        raise subprocess.CalledProcessError(exit_code, cmd, output=output)
+        raise CalledProcessError(exit_code, cmd, output=output)
     return output
 
 
