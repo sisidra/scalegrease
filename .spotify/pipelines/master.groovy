@@ -1,0 +1,26 @@
+@Grab(group = 'com.spotify', module = 'pipeline-conventions', version = '0.0.6-SNAPSHOT', changing = true)
+
+import com.spotify.pipeline.*
+
+def VERSION = '0.0'
+def EPOCH = '0'
+
+use(Pipeline, dist.Deb) {
+    pipeline {
+        stage('Squeeze build') {
+            pipelineVersion("${EPOCH}:${VERSION}")
+            buildPackage(distro: 'unstable', release: 'squeeze')
+        }
+        stage('Squeeze upload') {
+            uploadPackage(distro: 'unstable', release: 'squeeze')
+            uploadPackage(distro: 'stable', release: 'squeeze')
+        }
+        stage('Trusty build') {
+            buildPackage(distro: 'unstable', release: 'trusty')
+        }
+        stage('Trusty upload') {
+            uploadPackage(distro: 'unstable', release: 'trusty')
+            uploadPackage(distro: 'stable', release: 'trusty')
+        }
+    }
+}
