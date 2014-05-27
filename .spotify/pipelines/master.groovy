@@ -2,7 +2,7 @@
 
 import com.spotify.pipeline.*
 
-def VERSION = '0.0'
+def VERSION = '0.1'
 def EPOCH = '0'
 
 use(Pipeline, dist.Deb) {
