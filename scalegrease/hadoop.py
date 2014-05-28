@@ -22,6 +22,6 @@ class HadoopRunner(runner.RunnerBase):
             return False
 
     def run_job(self, jar_path, artifact_spec, argv):
-        hadoop_cmd = self._config["command"] + [jar_path]
+        hadoop_cmd = self._config["command"] + [jar_path] + argv
         logging.info("Executing: %s", " ".join(hadoop_cmd))
         subprocess.check_call(hadoop_cmd)
