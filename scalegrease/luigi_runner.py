@@ -47,7 +47,7 @@ class LuigiRunner(RunnerBase):
         sub_env["PLATFORM_ARTIFACT_SPEC"] = artifact_spec
 
         src_path = os.path.join(self.tmp_dir, "python")
-        if sub_env["PYTHONPATH"]:
+        if "PYTHONPATH" in sub_env:
             sub_env["PYTHONPATH"] += ":" + src_path
         else:
             sub_env["PYTHONPATH"] = src_path
