@@ -1,12 +1,14 @@
 {
     "runners": [
         "scalegrease.luigi_runner.LuigiRunner",
-        "scalegrease.hadoop.HadoopRunner"
+        "scalegrease.hadoop.HadoopRunner",
+        "scalegrease.runner.ShellRunner"
     ],
     "LuigiRunner": {
         "command": "spluigi"
     },
     "HadoopRunner": {
         "command": ["hadoop", "jar"]
-    }
+    },
+    "ShellRunner": {}
 }
