@@ -1,5 +1,5 @@
 Source: scalegrease
-Section: net
+Section: non-free
 Priority: extra
 Maintainer: Lars Albertsson <lalle@spotify.com>
 Build-Depends: python (>= 2.6.6-3~), debhelper (>= 8), python-argparse

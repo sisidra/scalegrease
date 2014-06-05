@@ -1,6 +1,5 @@
 import logging
 import re
-import subprocess
 
 from scalegrease import error
 from scalegrease import system
@@ -34,7 +33,7 @@ def mvn_download(artifact, tmp_dir, offline):
         logging.debug(mvn_copy_out)
         return jar_path
 
-    except subprocess.CalledProcessError as e:
+    except system.CalledProcessError as e:
         logging.error("Maven failed: %s, output:\n%s", e, e.output)
         raise error.Error("Download failed: %s\n%s" % (e, e.output))
 

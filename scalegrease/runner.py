@@ -63,7 +63,7 @@ def main(argv):
                         help="Read configuration from CONFIG_FILE")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Increase debug verbosity")
-    parser.add_argument("--mvn-offline", "-o", default=False,
+    parser.add_argument("--mvn-offline", "-o", action="store_true",
                         help="Use Maven in offline mode")
     parser.add_argument(
         "artifact",

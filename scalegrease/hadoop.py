@@ -18,10 +18,10 @@ class HadoopRunner(runner.RunnerBase):
             jar_listing = system.check_output(["jar", "tf", jar_path])
             class_path = argv[0].replace(".", "/") + ".class"
             return class_path in jar_listing.splitlines()
-        except subprocess.CalledProcessError:
+        except system.CalledProcessError:
             return False
 
     def run_job(self, jar_path, artifact_spec, argv):
-        hadoop_cmd = self._config["command"] + [jar_path]
+        hadoop_cmd = self._config["command"] + [jar_path] + argv
         logging.info("Executing: %s", " ".join(hadoop_cmd))
         subprocess.check_call(hadoop_cmd)

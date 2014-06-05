@@ -5,6 +5,7 @@ import tempfile
 import zipfile
 import argparse
 
+from scalegrease import system
 from scalegrease.runner import RunnerBase
 
 
@@ -46,7 +47,7 @@ class LuigiRunner(RunnerBase):
         sub_env["PLATFORM_ARTIFACT_SPEC"] = artifact_spec
 
         src_path = os.path.join(self.tmp_dir, "python")
-        if sub_env["PYTHONPATH"]:
+        if "PYTHONPATH" in sub_env:
             sub_env["PYTHONPATH"] += ":" + src_path
         else:
             sub_env["PYTHONPATH"] = src_path
@@ -63,4 +64,4 @@ class LuigiRunner(RunnerBase):
         exit_code = process.poll()
         print output
         if exit_code:
-            raise subprocess.CalledProcessError(exit_code, cmd_line, output=output)
+            raise system.CalledProcessError(exit_code, cmd_line, output=output)
