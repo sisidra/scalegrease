@@ -24,7 +24,7 @@ class RunnerBase(object):
 
 class ShellRunner(RunnerBase):
     def run_job(self, jar_path, artifact, argv):
-        cmd_line = argv + [jar_path, artifact.spec]
+        cmd_line = argv + [jar_path, artifact.spec()]
         logging.info(' '.join(cmd_line))
         output = system.check_output(cmd_line)
         logging.info(output)
@@ -39,15 +39,15 @@ def find_runner(runner_name, config):
             return clazz(class_config)
 
 
-def run(runner_name, artifact, mvn_offline, runner_argv, config):
+def run(runner_name, artifact_spec, mvn_offline, runner_argv, config):
     runner = find_runner(runner_name, config)
     if runner is None:
         raise error.Error("Failed to find runner '%s'" % runner_name)
-    artifact = deploy.Artifact(artifact)
+    artifact_spec = deploy.Artifact.parse(artifact_spec)
     tmp_dir = tempfile.mkdtemp(prefix="greaserun")
-    jar_path = deploy.mvn_download(artifact, tmp_dir, mvn_offline)
+    jar_path = deploy.mvn_download(artifact_spec, tmp_dir, mvn_offline)
     try:
-        runner.run_job(jar_path, artifact, runner_argv)
+        runner.run_job(jar_path, artifact_spec, runner_argv)
         shutil.rmtree(tmp_dir)
     except system.CalledProcessError as e:
         logging.error("Runner %s failed: %s" % (runner_name, e))
