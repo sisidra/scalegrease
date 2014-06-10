@@ -1,4 +1,4 @@
-@Grab(group = 'com.spotify', module = 'pipeline-conventions', version = '0.0.6-SNAPSHOT', changing = true)
+@Grab(group = 'com.spotify', module = 'pipeline-conventions', version = '0.0.6', changing = true)
 
 import com.spotify.pipeline.*
 
