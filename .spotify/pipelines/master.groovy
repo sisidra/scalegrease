@@ -1,3 +1,6 @@
+// This file contains build specifications for Spotify internal CI/CD pipeline.  It can be safely
+// ignored.
+
 @Grab(group = 'com.spotify', module = 'pipeline-conventions', version = '0.0.6', changing = true)
 
 import com.spotify.pipeline.*
