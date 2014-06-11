@@ -1,4 +1,5 @@
 {
+    "_note": "Avoid environment variables in production. They are useful for testing, however.",
     "runners": [
         "scalegrease.luigi_runner.LuigiRunner",
         "scalegrease.hadoop.HadoopRunner",
@@ -10,5 +11,9 @@
     "HadoopRunner": {
         "command": ["hadoop", "jar"]
     },
-    "ShellRunner": {}
+    "ShellRunner": {},
+    "launch": {
+        "crontab_repository_host": "$SCALEGREASE_REPO_HOST",
+        "crontab_repository_dir": "$SCALEGREASE_REPO_DIR"
+    }
 }

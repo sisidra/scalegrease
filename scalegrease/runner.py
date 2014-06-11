@@ -4,7 +4,6 @@ import logging
 import shutil
 import sys
 import tempfile
-import json
 
 from scalegrease import deploy
 from scalegrease import error
@@ -54,33 +53,27 @@ def run(runner_name, artifact_spec, mvn_offline, runner_argv, config):
         raise
 
 
-def main(argv):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-file", "-c", default="/etc/scalegrease.json",
-                        help="Read configuration from CONFIG_FILE")
+def extra_arguments(parser):
     parser.add_argument("--runner", "-r", required=True,
                         help="Specify runner to use, e.g. hadoop, luigi.  "
                              "It should match one of the runner names in the config, "
                              "optionally with 'runner' removed.")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Increase debug verbosity")
     parser.add_argument("--mvn-offline", "-o", action="store_true",
                         help="Use Maven in offline mode")
     parser.add_argument(
         "artifact",
         help="Specify Maven artifact to download and run, either on format "
              "group_id:artifact_id:version or group_id:artifact_id for latest version.")
-    args, rest_argv = parser.parse_known_args(argv[1:])
-    if rest_argv[:1] == ['--']:
-        # Argparse really should have removed it for us.
-        rest_argv = rest_argv[1:]
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
-    logging.info("Reading configuration from %s", args.config_file)
-    conf_file = open(args.config_file)
-    conf = json.load(conf_file)
-    conf_file.close()
-    logging.debug("Configuration read:\n%s", conf)
+
+def main(argv):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config-file", "-c", default="/etc/scalegrease.json",
+                        help="Read configuration from CONFIG_FILE")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Increase debug verbosity")
+    extra_arguments(parser)
+    args, conf, rest_argv = system.initialise(argv, extra_arguments)
 
     try:
         run(args.runner, args.artifact, args.mvn_offline, rest_argv, conf)
