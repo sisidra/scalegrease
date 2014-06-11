@@ -51,7 +51,7 @@ def determine_latest(repo, artifact):
         tree = ElementTree.parse(metadata)
     except IOError as err:
         raise error.Error("%s: %s" % (error_msg, err))
-    latest = tree.findall(".versioning/latest")
+    latest = tree.findall("versioning/latest")
     if len(latest) != 1:
         raise error.Error("%s: Unexpected XML content", error_msg)
     return latest[0].text
