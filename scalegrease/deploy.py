@@ -8,6 +8,15 @@ from scalegrease import error
 from scalegrease import system
 
 
+def extract_canonical_version(jar_path, artifact):
+    jar_name = os.path.basename(jar_path)
+    beginning = "{0}-".format(artifact.artifact_id)
+    ending = "-{0}.{1}".format(artifact.classifier, artifact.packaging)
+    if not (jar_name.startswith(beginning) and jar_name.endswith(ending)):
+        raise ValueError("Jar file name does not match artifact.")
+    return jar_name[len(beginning):-len(ending)]
+
+
 def mvn_download(artifact, offline):
     """Download artifact from maven repository to local directory.
 
@@ -40,8 +49,8 @@ def mvn_download(artifact, offline):
         copying_re = r'Copying .*\.jar to (.*)'
         match = re.search(copying_re, mvn_copy_out)
         jar_name = match.group(1)
-        version = jar_name.split('-')[-4]
-        canonical_artifact = artifact.with_version(version)
+        version = extract_canonical_version(jar_name, artifact)
+        canonical_artifact = artifact.with_canonical_version(version)
 
         local_repo = "%s/.m2/repository" % os.environ["HOME"]
         jar_path = "{0}/{1}".format(local_repo, canonical_artifact.jar_path())
@@ -56,12 +65,13 @@ def mvn_download(artifact, offline):
 
 class Artifact(object):
     def __init__(self, group_id, artifact_id, version="LATEST", packaging="jar",
-                 classifier="jar-with-dependencies"):
+                 classifier="jar-with-dependencies", canonical_version=None):
         self.group_id = group_id
         self.artifact_id = artifact_id
         self.version = version
         self.packaging = packaging
         self.classifier = classifier
+        self.canonical_version = canonical_version
 
     def path(self):
         return "%s/%s" % (self.group_id.replace(".", "/"), self.artifact_id)
@@ -71,14 +81,20 @@ class Artifact(object):
                          self.packaging, self.classifier))
 
     def jar_name(self):
+        version = self.canonical_version or self.version
         return "{0}-{1}-{2}.{3}".format(
-            self.artifact_id, self.version, self.classifier, self.packaging)
+            self.artifact_id, version, self.classifier, self.packaging)
 
     def jar_path(self):
         return "%s/%s/%s" % (self.path(), self.version, self.jar_name())
 
-    def with_version(self, version):
-        return Artifact(self.group_id, self.artifact_id, version)
+    def with_canonical_version(self, canonical_version):
+        return Artifact(
+            self.group_id,
+            self.artifact_id,
+            version=self.version,
+            canonical_version=canonical_version
+        )
 
     @classmethod
     def parse(cls, artifact_spec):
