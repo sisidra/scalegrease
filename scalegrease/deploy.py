@@ -8,7 +8,7 @@ from scalegrease import error
 from scalegrease import system
 
 
-def extract_canonical_version(jar_path, artifact):
+def extract_version(jar_path, artifact):
     jar_name = os.path.basename(jar_path)
     beginning = "{0}-".format(artifact.artifact_id)
     ending = "-{0}.{1}".format(artifact.classifier, artifact.packaging)
@@ -46,11 +46,12 @@ def mvn_download(artifact, offline):
         mvn_copy_out = system.check_output(mvn_copy_cmd)
         logging.debug(mvn_copy_out)
 
-        copying_re = r'Copying .*\.jar to (.*)'
+        copying_re = r'Copying (.*\.jar) to (.*)'
+        print mvn_copy_out
         match = re.search(copying_re, mvn_copy_out)
-        jar_name = match.group(1)
-        version = extract_canonical_version(jar_name, artifact)
-        canonical_artifact = artifact.with_canonical_version(version)
+        version = extract_version(match.group(1), artifact)
+        canonical_version = extract_version(match.group(1), artifact)
+        canonical_artifact = artifact.with_version(version, canonical_version)
 
         local_repo = "%s/.m2/repository" % os.environ["HOME"]
         jar_path = "{0}/{1}".format(local_repo, canonical_artifact.jar_path())
@@ -88,11 +89,11 @@ class Artifact(object):
     def jar_path(self):
         return "%s/%s/%s" % (self.path(), self.version, self.jar_name())
 
-    def with_canonical_version(self, canonical_version):
+    def with_version(self, version, canonical_version):
         return Artifact(
             self.group_id,
             self.artifact_id,
-            version=self.version,
+            version=version,
             canonical_version=canonical_version
         )
 
