@@ -41,7 +41,7 @@ def run(runner_name, artifact_spec, mvn_offline, runner_argv, config):
     if runner is None:
         raise error.Error("Failed to find runner '%s'" % runner_name)
     artifact_spec = deploy.Artifact.parse(artifact_spec)
-    jar_path = deploy.mvn_download(artifact_spec, mvn_offline)
+    jar_path = artifact_spec.fetch(mvn_offline)
     try:
         runner.run_job(jar_path, artifact_spec, runner_argv)
     except system.CalledProcessError as e:
