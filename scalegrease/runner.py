@@ -1,9 +1,7 @@
 import abc
 import argparse
 import logging
-import shutil
 import sys
-import tempfile
 
 from scalegrease import deploy
 from scalegrease import error
@@ -43,11 +41,9 @@ def run(runner_name, artifact_spec, mvn_offline, runner_argv, config):
     if runner is None:
         raise error.Error("Failed to find runner '%s'" % runner_name)
     artifact_spec = deploy.Artifact.parse(artifact_spec)
-    tmp_dir = tempfile.mkdtemp(prefix="greaserun")
-    jar_path = deploy.mvn_download(artifact_spec, tmp_dir, mvn_offline)
+    jar_path = deploy.mvn_download(artifact_spec, mvn_offline)
     try:
         runner.run_job(jar_path, artifact_spec, runner_argv)
-        shutil.rmtree(tmp_dir)
     except system.CalledProcessError as e:
         logging.error("Runner %s failed: %s" % (runner_name, e))
         raise

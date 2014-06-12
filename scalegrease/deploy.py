@@ -1,76 +1,78 @@
 import logging
 import os
-from xml.etree import ElementTree
+import re
+import shutil
+import tempfile
 
 from scalegrease import error
 from scalegrease import system
 
 
-def mvn_download(artifact, tmp_dir, offline):
+def mvn_download(artifact, offline):
     """Download artifact from maven repository to local directory.
 
     Maven will by default do local repository caching for us, which we want in order to avoid
     hammering the artifactory server, and also to avoid the artifactory being a single point of
-    failure.  An artifactory failure will prevent new versions from getting rolled out, but not
-    jobs from running.
+    failure.  An artifactory failure will prevent new versions from getting rolled out,
+    but not prevent jobs from running.
     """
+    tmp_dir = tempfile.mkdtemp(prefix="greaserun")
     try:
         # Notes on maven behaviour:  In case of network failure, it will reuse the locally cached
         # repository metadata gracefully, and therefore use the latest downloaded version.
         # In case multiple maven processes are running, they might download a new artifact
-        # concurrently.  Maven downloads to temporary file and renames, however, so each file
+        # concurrently.  Maven downloads to temporary files and renames them, however, so each file
         # download is atomic, and no external locking should be needed.
-        mvn_get_cmd = [
-            "mvn", "-e", "-o" if offline else "-U",
-            "org.apache.maven.plugins:maven-dependency-plugin:2.8:get",
-            "-Dartifact=%s:%s:%s:jar:jar-with-dependencies" %
-            (artifact.group_id, artifact.artifact_id, artifact.version)]
 
-        logging.info(" ".join(mvn_get_cmd))
-        mvn_get_out = system.check_output(mvn_get_cmd)
-        logging.debug(mvn_get_out)
-        # The maven dependency plugin does not report which version is the latest, so peek into the
-        # local repository.  There are other plugins, e.g. versions-maven-plugin that can, but they
-        # require a pom, so that's a bit messy as well.
+        # We use the "copy" command rather than "get", since "get" won't tell us which version it
+        # resolved to.  Discard the copied file and use the one in the local repository in order
+        # to save some resources.  Consider it a way to pre-warm the OS caches. :-)
+        mvn_copy_cmd = [
+            "mvn", "-e", "-o" if offline else "-U",
+            "org.apache.maven.plugins:maven-dependency-plugin:2.8:copy",
+            "-DoutputDirectory=" + tmp_dir,
+            "-Dartifact={0}".format(artifact.spec())]
+
+        logging.info(" ".join(mvn_copy_cmd))
+        mvn_copy_out = system.check_output(mvn_copy_cmd)
+        logging.debug(mvn_copy_out)
+
+        copying_re = r'Copying .*\.jar to (.*)'
+        match = re.search(copying_re, mvn_copy_out)
+        jar_name = match.group(1)
+        version = jar_name.split('-')[-4]
+        canonical_artifact = artifact.with_version(version)
+
         local_repo = "%s/.m2/repository" % os.environ["HOME"]
-        version = determine_latest(local_repo, artifact)
-        versioned_artifact = artifact.with_version(version)
-        jar_path = "%s/%s" % (local_repo, versioned_artifact.jar_path())
+        jar_path = "{0}/{1}".format(local_repo, canonical_artifact.jar_path())
         logging.info("Downloaded %s to %s", artifact.spec(), jar_path)
         return jar_path
-
     except system.CalledProcessError as e:
         logging.error("Maven failed: %s, output:\n%s", e, e.output)
         raise error.Error("Download failed: %s\n%s" % (e, e.output))
-
-
-def determine_latest(repo, artifact):
-    error_msg = "Failed to find latest version metadata for " + artifact.spec()
-    metadata = "%s/%s/maven-metadata-repo.xml" % (repo, artifact.path())
-    try:
-        tree = ElementTree.parse(metadata)
-    except IOError as err:
-        raise error.Error("%s: %s" % (error_msg, err))
-    latest = tree.findall("versioning/latest")
-    if len(latest) != 1:
-        raise error.Error("%s: Unexpected XML content", error_msg)
-    return latest[0].text
+    finally:
+        shutil.rmtree(tmp_dir)
 
 
 class Artifact(object):
-    def __init__(self, group_id, artifact_id, version="LATEST"):
+    def __init__(self, group_id, artifact_id, version="LATEST", packaging="jar",
+                 classifier="jar-with-dependencies"):
         self.group_id = group_id
         self.artifact_id = artifact_id
         self.version = version
+        self.packaging = packaging
+        self.classifier = classifier
 
     def path(self):
         return "%s/%s" % (self.group_id.replace(".", "/"), self.artifact_id)
 
     def spec(self):
-        return ':'.join((self.group_id, self.artifact_id, self.version))
+        return ':'.join((self.group_id, self.artifact_id, self.version,
+                         self.packaging, self.classifier))
 
     def jar_name(self):
-        return "%s-%s-jar-with-dependencies.jar" % (self.artifact_id, self.version)
+        return "{0}-{1}-{2}.{3}".format(
+            self.artifact_id, self.version, self.classifier, self.packaging)
 
     def jar_path(self):
         return "%s/%s/%s" % (self.path(), self.version, self.jar_name())
@@ -80,4 +82,8 @@ class Artifact(object):
 
     @classmethod
     def parse(cls, artifact_spec):
+        """Parse a maven artifact specifier.
+
+        Note that the weird part ordering documented in http://maven.apache.org/pom.html does not
+        match the implementation in maven..."""
         return Artifact(*artifact_spec.split(':'))
