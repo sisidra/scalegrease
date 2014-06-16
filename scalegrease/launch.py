@@ -52,6 +52,6 @@ def main(argv):
 
     try:
         launch(args.cron_glob, args.pom_file, conf)
-    except error.Error as e:
-        logging.error("Job failed: %s", e)
+    except error.Error:
+        logging.exception("Job failed")
         return 1

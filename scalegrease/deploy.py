@@ -4,12 +4,50 @@ import re
 import shutil
 import tempfile
 import abc
+import argparse
 
 from scalegrease import error
 from scalegrease import system
 
 
-def extract_version(jar_path, artifact):
+class ArtifactStorage(object):
+    __metaclass__ = abc.ABCMeta
+
+    def __init__(self, artifact_spec):
+        self.artifact_spec = artifact_spec
+
+    @classmethod
+    def resolve(cls, artifact_spec):
+        if os.path.exists(artifact_spec):
+            return LocalStorage(artifact_spec)
+        else:
+            return MavenStorage(artifact_spec)
+
+    @abc.abstractmethod
+    def fetch(self, argv):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def jar_path(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def spec(self):
+        raise NotImplementedError()
+
+
+class LocalStorage(ArtifactStorage):
+    def jar_path(self):
+        return self.artifact_spec
+
+    def fetch(self, argv):
+        return argv
+
+    def spec(self):
+        return self.artifact_spec
+
+
+def _extract_version(jar_path, artifact):
     jar_name = os.path.basename(jar_path)
     beginning = "{0}-".format(artifact.artifact_id)
     ending = "-{0}.{1}".format(artifact.classifier, artifact.packaging)
@@ -18,74 +56,32 @@ def extract_version(jar_path, artifact):
     return jar_name[len(beginning):-len(ending)]
 
 
-class Artifact(object):
-    __metaclass__ = abc.ABCMeta
+class MavenStorage(ArtifactStorage):
+    def __init__(self, artifact_spec):
+        super(MavenStorage, self).__init__(artifact_spec)
 
-    @classmethod
-    def parse(cls, artifact_spec):
-        if os.path.exists(artifact_spec):
-            return LocalArtifact(artifact_spec)
-        else:
-            """Parse a maven artifact specifier.
+        """Parse a maven artifact specifier.
 
-            Note that the weird part ordering documented in http://maven.apache.org/pom.html does not
-            match the implementation in maven..."""
-            return MvnArtifact(*artifact_spec.split(':'))
+        Note that the weird part ordering documented in http://maven.apache.org/pom.html does not
+        match the implementation in maven..."""
+        self.artifact = MavenArtifact(*self.artifact_spec.split(':'))
 
-    @abc.abstractmethod
-    def fetch(self, offline=None):
-        raise NotImplementedError()
+        self.canonical_artifact = None
 
-    @abc.abstractmethod
-    def spec(self):
-        raise NotImplementedError()
+    def fetch(self, argv):
+        offline, rest_argv = self._parse_args(argv)
+        self._fetch_jar(offline)
+        return rest_argv
 
+    def _parse_args(self, argv):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--mvn-offline", "-o",
+                            action="store_true",
+                            help="Use Maven in offline mode")
+        args, rest_argv = parser.parse_known_args(argv)
+        return args.mvn_offline, rest_argv
 
-class LocalArtifact(Artifact):
-    def __init__(self, path):
-        self.path = path
-
-    def fetch(self, *args):
-        return self.path
-
-    def spec(self):
-        return self.path
-
-
-class MvnArtifact(Artifact):
-    def __init__(self, group_id, artifact_id, version="LATEST", packaging="jar",
-                 classifier="jar-with-dependencies", canonical_version=None):
-        self.group_id = group_id
-        self.artifact_id = artifact_id
-        self.version = version
-        self.packaging = packaging
-        self.classifier = classifier
-        self.canonical_version = canonical_version
-
-    def path(self):
-        return "%s/%s" % (self.group_id.replace(".", "/"), self.artifact_id)
-
-    def spec(self):
-        return ':'.join((self.group_id, self.artifact_id, self.version,
-                         self.packaging, self.classifier))
-
-    def jar_name(self):
-        version = self.canonical_version or self.version
-        return "{0}-{1}-{2}.{3}".format(
-            self.artifact_id, version, self.classifier, self.packaging)
-
-    def jar_path(self):
-        return "%s/%s/%s" % (self.path(), self.version, self.jar_name())
-
-    def with_version(self, version, canonical_version):
-        return MvnArtifact(
-            self.group_id,
-            self.artifact_id,
-            version=version,
-            canonical_version=canonical_version
-        )
-
-    def fetch(self, offline=False):
+    def _fetch_jar(self, offline):
         """Download artifact from maven repository to local directory.
 
         Maven will by default do local repository caching for us, which we want in order to avoid
@@ -115,18 +111,63 @@ class MvnArtifact(Artifact):
             logging.debug(mvn_copy_out)
 
             copying_re = r'Copying (.*\.jar) to (.*)'
-            print mvn_copy_out
             match = re.search(copying_re, mvn_copy_out)
-            version = extract_version(match.group(1), self)
-            canonical_version = extract_version(match.group(1), self)
-            canonical_artifact = self.with_version(version, canonical_version)
+            version = _extract_version(match.group(1), self.artifact)
+            canonical_version = _extract_version(match.group(2), self.artifact)
+            self.canonical_artifact = self.artifact.with_version(version, canonical_version)
 
-            local_repo = "%s/.m2/repository" % os.environ["HOME"]
-            jar_path = "{0}/{1}".format(local_repo, canonical_artifact.jar_path())
-            logging.info("Downloaded %s to %s", self.spec(), jar_path)
-            return jar_path
+            logging.info("Downloaded %s to %s", self.spec(), self.jar_path())
         except system.CalledProcessError as e:
-            logging.error("Maven failed: %s, output:\n%s", e, e.output)
+            logging.exception("Maven failed. Output:\n%s", e.output)
             raise error.Error("Download failed: %s\n%s" % (e, e.output))
         finally:
             shutil.rmtree(tmp_dir)
+
+    def jar_path(self):
+        if self.canonical_artifact is None:
+            raise error.Error("Artifact is not downloaded from repository")
+
+        local_repo = "%s/.m2/repository" % os.environ["HOME"]
+        jar_path = "{0}/{1}".format(local_repo, self.canonical_artifact.jar_path)
+        return jar_path
+
+    def spec(self):
+        return self.artifact.spec
+
+
+class MavenArtifact(object):
+    def __init__(self, group_id, artifact_id, version="LATEST", packaging="jar",
+                 classifier="jar-with-dependencies", canonical_version=None):
+        self.group_id = group_id
+        self.artifact_id = artifact_id
+        self.version = version
+        self.packaging = packaging
+        self.classifier = classifier
+        self.canonical_version = canonical_version
+
+    @property
+    def spec(self):
+        return ':'.join((self.group_id, self.artifact_id, self.version,
+                         self.packaging, self.classifier))
+
+    @property
+    def path(self):
+        return "%s/%s" % (self.group_id.replace(".", "/"), self.artifact_id)
+
+    @property
+    def jar_name(self):
+        version = self.canonical_version or self.version
+        return "{0}-{1}-{2}.{3}".format(
+            self.artifact_id, version, self.classifier, self.packaging)
+
+    @property
+    def jar_path(self):
+        return "%s/%s/%s" % (self.path, self.version, self.jar_name)
+
+    def with_version(self, version, canonical_version):
+        return MavenArtifact(
+            self.group_id,
+            self.artifact_id,
+            version=version,
+            canonical_version=canonical_version
+        )

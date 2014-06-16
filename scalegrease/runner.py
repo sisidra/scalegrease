@@ -15,13 +15,13 @@ class RunnerBase(object):
         self._config = config
 
     @abc.abstractmethod
-    def run_job(self, jar_path, artifact, argv):
+    def run_job(self, artifact_storage, argv):
         raise NotImplementedError()
 
 
 class ShellRunner(RunnerBase):
-    def run_job(self, jar_path, artifact, argv):
-        cmd_line = argv + [jar_path, artifact.spec()]
+    def run_job(self, artifact_storage, argv):
+        cmd_line = argv + [artifact_storage.jar_path(), artifact_storage.spec()]
         logging.info(' '.join(cmd_line))
         output = system.check_output(cmd_line)
         logging.info(output)
@@ -36,16 +36,16 @@ def find_runner(runner_name, config):
             return clazz(class_config)
 
 
-def run(runner_name, artifact_spec, mvn_offline, runner_argv, config):
+def run(runner_name, artifact_spec, runner_argv, config):
     runner = find_runner(runner_name, config)
     if runner is None:
         raise error.Error("Failed to find runner '%s'" % runner_name)
-    artifact_spec = deploy.Artifact.parse(artifact_spec)
-    jar_path = artifact_spec.fetch(mvn_offline)
+    artifact_storage = deploy.ArtifactStorage.resolve(artifact_spec)
+    job_argv = artifact_storage.fetch(runner_argv)
     try:
-        runner.run_job(jar_path, artifact_spec, runner_argv)
+        runner.run_job(artifact_storage, job_argv)
     except system.CalledProcessError as e:
-        logging.error("Runner %s failed: %s" % (runner_name, e))
+        logging.exception("Runner %s failed" % runner_name)
         raise
 
 
@@ -54,8 +54,6 @@ def extra_arguments(parser):
                         help="Specify runner to use, e.g. hadoop, luigi.  "
                              "It should match one of the runner names in the config, "
                              "optionally with 'runner' removed.")
-    parser.add_argument("--mvn-offline", "-o", action="store_true",
-                        help="Use Maven in offline mode")
     parser.add_argument(
         "artifact",
         help="Specify Maven artifact to download and run, either on format "
@@ -63,18 +61,11 @@ def extra_arguments(parser):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-file", "-c", default="/etc/scalegrease.json",
-                        help="Read configuration from CONFIG_FILE")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Increase debug verbosity")
-    extra_arguments(parser)
     args, conf, rest_argv = system.initialise(argv, extra_arguments)
-
     try:
-        run(args.runner, args.artifact, args.mvn_offline, rest_argv, conf)
-    except error.Error as e:
-        logging.error("Job failed: %s", e)
+        run(args.runner, args.artifact, rest_argv, conf)
+    except error.Error:
+        logging.exception("Job failed")
         return 1
 
 
