@@ -38,7 +38,6 @@ def read_file(path):
         return f.read()
 
 
-
 def load_class(rn):
     module_name, class_name = rn.rsplit('.', 1)
     mod = __import__(module_name, globals(), locals(), [class_name])

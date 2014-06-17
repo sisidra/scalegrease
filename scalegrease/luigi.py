@@ -8,15 +8,15 @@ from scalegrease.runner import RunnerBase
 
 
 class LuigiRunner(RunnerBase):
-    def run_job(self, jar_path, artifact, argv):
+    def run_job(self, artifact_storage, argv):
         tmp_dir = tempfile.mkdtemp()
         try:
-            self._extract_luigi_resources(jar_path, tmp_dir)
-            self._run_luigi_task(artifact, argv, tmp_dir)
+            self._extract_python_resources(artifact_storage.jar_path(), tmp_dir)
+            self._run_luigi_task(artifact_storage, argv, tmp_dir)
         finally:
             shutil.rmtree(tmp_dir)
 
-    def _extract_luigi_resources(self, jar_path, tmp_dir):
+    def _extract_python_resources(self, jar_path, tmp_dir):
         jar_file = zipfile.ZipFile(jar_path, "r")
         for info in jar_file.infolist():
             resource_path = info.filename
