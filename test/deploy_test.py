@@ -39,16 +39,20 @@ class MavenStorageTest(TestCase):
 [INFO] ------------------------------------------------------------------------
 [INFO]
 [INFO] --- maven-dependency-plugin:2.8:copy (default-cli) @ standalone-pom ---
-[INFO] Configured Artifact: com.spotify:scalegrease:{0}:jar-with-dependencies:jar
-[INFO] Copying scalegrease-{1}-jar-with-dependencies.jar to /tmp/path/scalegrease-{2}-jar-with-dependencies.jar
+[INFO] Configured Artifact: com.spotify:scalegrease:jar-with-dependencies:{0}:jar
+Downloading: https://artifactory/artifactory/repo/com/spotify/scalegrease/maven-metadata.xml
+Downloaded: https://artifactory/artifactory/repo/com/spotify/scalegrease/maven-metadata.xml (X B at Y KB/sec)
+Downloading: https://artifactory/artifactory/repo/com/spotify/scalegrease/{1}/maven-metadata.xml
+Downloaded: https://artifactory/artifactory/repo/com/spotify/scalegrease/{1}/maven-metadata.xml (X B at Y KB/sec)
+[INFO] Copying scalegrease-{1}-jar-with-dependencies.jar to /var/folders/cr/58yvk6z94qg_bmvnpsj73h5w0000gn/T/greaserunr1qxCN/scalegrease-0.0.1-30000101.123456-7-jar-with-dependencies.jar
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
 [INFO] Total time: 0.001 s
-[INFO] Finished at: 3000-01-01T00:00:00+00:00
+[INFO] Finished at: 1234-12-12T12:12:12+00:00
 [INFO] Final Memory: XM/YM
 [INFO] ------------------------------------------------------------------------
-    """
+"""
 
     def test_not_fetched(self):
         storage = MavenStorage("group:artifact:version")
@@ -77,9 +81,9 @@ class MavenStorageTest(TestCase):
     @patch("scalegrease.deploy.os.environ", new={"HOME": "/home/scalegrease"})
     @patch("scalegrease.deploy.system.check_output",
            new=lambda(args): MavenStorageTest._MVN_CLI_OUTPUT.format(
-               "LATEST", "0.0.1-SNAPSHOT", "0.0.1-30000101T0000"))
+               "LATEST", "0.0.1-SNAPSHOT", "0.0.1-30000101.123456-7"))
     def test_fetch_parsing(self):
         storage = MavenStorage("com.spotify:scalegrease")
         storage.fetch([])
-        self.assertEqual("/home/scalegrease/.m2/repository/com/spotify/scalegrease/0.0.1-SNAPSHOT/scalegrease-0.0.1-30000101T0000-jar-with-dependencies.jar", storage.jar_path())
+        self.assertEqual("/home/scalegrease/.m2/repository/com/spotify/scalegrease/0.0.1-SNAPSHOT/scalegrease-0.0.1-30000101.123456-7-jar-with-dependencies.jar", storage.jar_path())
         self.assertEqual("com.spotify:scalegrease:LATEST:jar:jar-with-dependencies", storage.spec())
